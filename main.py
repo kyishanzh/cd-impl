@@ -1,9 +1,12 @@
 import transformers as tr
+import torch
 
 amateur_path = "Qwen/Qwen2.5-Coder-0.5B-Instruct"
 expert_path = "Qwen/Qwen2.5-Coder-1.5B-Instruct"
 
-tokenizer = tr.AutoTokenizer.from_pretrained(amateur_path)
+tokenizer = tr.AutoTokenizer.from_pretrained(amateur_path, trust_remote_code=True)
+
+ALPHA = 0.1  # constant specified in the paper
 
 user_message = """Give a very very brief docstring for the following function:\n```\nfunction updateEloScores(
 	scores,
@@ -39,5 +42,24 @@ prompt = tokenizer.apply_chat_template(
 )
 
 
+def load_models():
+    """
+    Load models from HuggingFace.
+    :return:
+    """
+    expert = tr.AutoModelForCausalLM.from_pretrained(expert_path, device_map="auto")
+    amateur = tr.AutoModelForCausalLM.from_pretrained(amateur_path, device_map="auto")
+    print("Models loaded!")
+    return amateur, expert
+
+
 def contrastive_generation(amateur, expert, prompt, max_tokens) -> str:
-    return ""
+    # tokenize prompt
+    input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(expert.device)
+
+    return input_ids
+
+
+if __name__ == "__main__":
+    amateur_model, expert_model = load_models()
+    print(contrastive_generation(amateur_model, expert_model, prompt, 128))

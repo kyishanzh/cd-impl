@@ -149,9 +149,58 @@ def contrastive_generation(amateur, expert, prompt, max_tokens=None) -> str:
     return generated_text
 
 
+def vanilla_generation(model, prompt, max_tokens) -> str:
+    """
+    Generate text using only the expert model with the same token-by-token approach
+    as the contrastive decoding implementation for fair comparison.
+    """
+    encoded = tokenizer(prompt, return_tensors="pt", padding=True, truncation=True)
+    input_ids = encoded.input_ids.to(model.device)
+    attention_mask = encoded.attention_mask.to(model.device)
+
+    generated_ids = input_ids.clone()
+    past_key_values = None
+
+    for _ in tqdm(range(max_tokens), desc="Vanilla generation"):
+        if generated_ids.shape[1] == input_ids.shape[1]:
+            curr_input_ids = generated_ids
+        else:
+            curr_input_ids = generated_ids[:, -1].unsqueeze(-1)
+
+        outputs = model(
+            input_ids=curr_input_ids,
+            attention_mask=attention_mask,
+            use_cache=True,
+            past_key_values=past_key_values
+        )
+
+        logits = outputs.logits[:, -1, :]
+        past_key_values = outputs.past_key_values
+
+        probs = torch.softmax(logits, dim=-1)
+        next_token = torch.argmax(probs, dim=-1).unsqueeze(-1)
+
+        generated_ids = torch.cat([generated_ids, next_token], dim=-1)
+
+        new_mask = torch.ones((attention_mask.size(0), 1), dtype=attention_mask.dtype, device=attention_mask.device)
+        attention_mask = torch.cat([attention_mask, new_mask], dim=-1)
+
+        if next_token.item() == tokenizer.eos_token_id:
+            break
+
+    generated_text = tokenizer.decode(generated_ids[0, input_ids.shape[1]:], skip_special_tokens=True)
+    return generated_text
+
+
 if __name__ == "__main__":
     amateur_model, expert_model = load_models()
-    cd_response = contrastive_generation(amateur_model, expert_model, prompt, max_tokens=100)
-    # print("AMATEUR RESPONSE ---------\n", amateur_response)
-    # print("EXPERT RESPONSE ---------\n", expert_response)
+    cd_response = contrastive_generation(amateur_model, expert_model, prompt, max_tokens=128)
+
     print("CD RESPONSE ---------\n", cd_response)
+
+    expert_response = vanilla_generation(expert_model, prompt, 128)
+    print("EXPERT RESPONSE ---------\n", expert_response)
+
+    amateur_response = vanilla_generation(amateur_model, prompt, 128)
+    print("AMATEUR RESPONSE ---------\n", amateur_response)
+

@@ -2,8 +2,7 @@
 ## Question 1
 **What should you do if the two models have different tokenizers?**
 
-**Answer:** If the two models have different tokenizers, ...
-Contrastive Decoding relies on comparing logits for identical token indices, so both models must treat your current sequence with a consistent vocabulary. If the models have incompatible tokenizers, you need to do some alignment. A simple—but sometimes imperfect—approach is to force both models to use the larger model’s tokenizer, encoding the text with that tokenizer for both models. You’d then ignore or remap any unknown tokens or mismatches when running the smaller model. Another option is to train or adapt one model to match the other’s tokenizer. These workarounds may not be perfectly accurate, but they’re necessary whenever the two models do not share an identical vocabulary.
+**Answer:** If the two models have different tokenizers, we could potentially try to fine-tune one of the models with the tokenizer of the other model such that they are aligned for the contrastive decoding process. There also exist tokenizer “translators” (e.g. https://arxiv.org/html/2405.07883v1) that we could potentially use to translate one tokenizer to the other. 
 
 ## Question 2
 **Do you think contrastive decoding is used in practice?**
